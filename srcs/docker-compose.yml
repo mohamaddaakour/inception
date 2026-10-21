@@ -1,0 +1,14 @@
+# Defines the Docker Compose project name.
+name: inception
+
+# Declares the Docker networks used by our infrastructure.
+networks:
+  # Defines a network with the logical name `inception`.
+  inception:
+    # Sets the actual Docker network name to inception,
+    # rather than the automatically generated Compose name.
+    name: inception
+
+    # Uses Docker's bridge network driver, allowing containers
+    # connected to this network to communicate with each other.
+    driver: bridge
