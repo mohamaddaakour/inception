@@ -1,4 +1,4 @@
-# Uses Debian 12 as our base image.
+# Uses Debian 12 (stable version) as our base image.
 FROM debian:bookworm
 
 # Download MariaDB.
@@ -8,11 +8,11 @@ RUN apt-get update \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+COPY tools/init.sh /usr/local/bin/init.sh
+
+RUN chmod 755 /usr/local/bin/init.sh
+
 # Documents that MariaDB normally listens on port 3306.
 EXPOSE 3306
 
-# Defines the default process that will run when the container starts.
-# 1. mariadbd is the MariaDB server.
-# 2. --user=mysql runs the database server as the mysql user.
-# 3. --console directs server logging to the console where supported.
-CMD ["mariadbd", "--user=mysql", "--console"]
+ENTRYPOINT ["/usr/local/bin/init.sh"]
