@@ -1,0 +1,16 @@
+# MariaDB server configuration
+[mysqld]
+
+# Listen on all IPv4 network interfaces
+bind-address = 0.0.0.0
+
+# Default MariaDB TCP port
+port = 3306
+
+# Directory where database files are stored
+datadir = /var/lib/mysql
+
+# Unix socket for local communication
+# A Unix socket allows processes inside the same
+# container to communicate with MariaDB without using TCP/IP.
+socket = /run/mysqld/mysqld.sock

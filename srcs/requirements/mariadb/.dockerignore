@@ -1,0 +1,6 @@
+**
+!Dockerfile
+!conf/
+!conf/*.cnf
+!tools/
+!tools/*.sh

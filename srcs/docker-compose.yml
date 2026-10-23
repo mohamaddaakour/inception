@@ -1,6 +1,34 @@
 # Defines the Docker Compose project name.
 name: inception
 
+services:
+  mariadb:
+    image: mariadb:inception
+    build: ./requirements/mariadb
+    # Build our Dockerfile; never substitute the upstream MariaDB image.
+    pull_policy: never
+    env_file:
+      - .env
+    secrets:
+      - db_password
+      - db_root_password
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - inception
+    restart: unless-stopped
+    stop_grace_period: 60s
+
+volumes:
+  # Docker's data-root must be under /home/<login>/data on the project VM.
+  mariadb_data:
+
+secrets:
+  db_password:
+    file: ../secrets/db_password.txt
+  db_root_password:
+    file: ../secrets/db_root_password.txt
+
 # Declares the Docker networks used by our infrastructure.
 networks:
   # Defines a network with the logical name `inception`.
