@@ -1,4 +1,3 @@
-
 #!/bin/sh
 set -eu
 # Restrict identifiers before inserting them into SQL. No SQL escaping guesswork.

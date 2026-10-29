@@ -1,0 +1,60 @@
+# Define an NGINX virtual server.
+server {
+
+    # Listen for HTTPS connections on port 443.
+    # ssl enables TLS encryption for incoming connections.
+    listen 443 ssl;
+
+    # Set the domain name that this server handles.
+    # ${DOMAIN_NAME} is a placeholder replaced during configuration
+    # generation, not automatically by NGINX.
+    server_name ${DOMAIN_NAME};
+
+    # Specify the SSL/TLS certificate and private key.
+    # The certificate identifies the server.
+    # The private key is used during secure TLS connections.
+    ssl_certificate /etc/nginx/tls/site.crt;
+    ssl_certificate_key /etc/nginx/tls/site.key;
+
+    # Allow only TLS versions 1.2 and 1.3 for secure connections.
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # Define the root directory containing the website files.
+    root /var/www/html;
+
+    # Handle requests to the exact root URL (/).
+    # The = modifier means an exact path match.
+    location = / {
+
+        # Redirect the browser temporarily to /health.php.
+        # 302 is the HTTP status code for a temporary redirect.
+        return 302 /health.php;
+    }
+
+    # Handle requests to exactly /health.php.
+    location = /health.php {
+
+        # Load standard FastCGI parameters required by PHP-FPM.
+        include /etc/nginx/fastcgi_params;
+
+        # Tell PHP-FPM the absolute path of the script to execute.
+        # $document_root refers to /var/www/html.
+        # The resulting path is /var/www/html/health.php.
+        fastcgi_param SCRIPT_FILENAME $document_root/health.php;
+
+        # Forward the request to the WordPress PHP-FPM container.
+        # Docker resolves "wordpress" to its container IP address.
+        # Port 9000 is used for FastCGI communication.
+        fastcgi_pass wordpress:9000;
+    }
+
+    # Handle all other requests that do not match
+    # the exact locations defined above.
+    location / {
+
+        # Return HTTP status code 404 (Not Found).
+        # This prevents access to other routes until
+        # WordPress is fully installed and configured.
+        return 404;
+    }
+}

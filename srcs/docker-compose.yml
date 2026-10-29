@@ -304,7 +304,7 @@ secrets:
 
     # Read the password from this file on the host.
     # The path is relative to the Compose file directory.
-    file: ../secrets/db_password.txt
+    file: ./secrets/db_password.txt
 
     # Compose makes this secret available only to services
     # that explicitly request it using "secrets".

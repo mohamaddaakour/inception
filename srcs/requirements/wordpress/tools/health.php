@@ -1,4 +1,3 @@
-
 <?php
 // This endpoint queries the real database. It is not a hardcoded success stub.
 header('Content-Type: application/json');
