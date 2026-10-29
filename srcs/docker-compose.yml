@@ -1,0 +1,310 @@
+# Set the name of the Docker Compose project to "inception".
+# Docker Compose uses this name to group and identify project resources.
+name: inception
+
+# Define the containers (services) that make up our application.
+services:
+
+  # MariaDB: Database server
+  mariadb:
+
+    # Name and tag of the Docker image for our MariaDB service.
+    image: mariadb:inception
+
+    # Never download this image from a remote registry.
+    # Only use an image available locally or build it from the Dockerfile.
+    pull_policy: never
+
+    # Path to the directory containing the MariaDB Dockerfile.
+    # The path is relative to the directory of this Compose file.
+    build: ./requirements/mariadb
+
+    # Always restart the container unless we stopped it manually.
+    restart: unless-stopped
+
+    # Define environment variables available inside the container.
+    environment:
+
+      # Read DB_NAME from the .env file and pass it to the container.
+      # If it is missing or empty, Compose stops with the given error.
+      DB_NAME: ${DB_NAME:?Set DB_NAME in srcs/.env}
+
+      # Read the database username from the .env file.
+      # The :? syntax requires a nonempty value.
+      DB_USER: ${DB_USER:?Set DB_USER in srcs/.env}
+
+    # Make the db_password secret available inside the container.
+    secrets: [db_password]
+
+    # Mount persistent storage inside the container.
+    volumes:
+
+      # Mount the named volume "database" at /var/lib/mysql.
+      # MariaDB stores its database files in this directory.
+      # The data survives container removal and recreation.
+      - database:/var/lib/mysql
+
+    # Connect MariaDB to the custom "inception" network.
+    # Other containers on this network can reach it using "mariadb".
+    networks: [inception]
+
+    # Define how Docker checks whether MariaDB is healthy.
+    healthcheck:
+
+      # Execute a shell command inside the container.
+      test:
+        - CMD-SHELL
+        - >-
+          test -f /var/lib/mysql/.inception-ready &&
+          mariadb --protocol=socket -uroot -Nse 'SELECT 1' >/dev/null
+
+      # Explanation of the command:
+      # 1. test -f: Check whether the initialization marker exists.
+      # 2. &&: Run the next command only if the marker exists.
+      # 3. mariadb: Run the MariaDB client.
+      # 4. --protocol=socket: Connect through a Unix socket.
+      # 5. -uroot: Connect as the MariaDB root user.
+      # 6. -N: Do not display column names.
+      # 7. -s: Use silent output.
+      # 8. -e 'SELECT 1': Execute a simple SQL query.
+      # 9. >/dev/null: Discard standard output.
+      #
+      # Exit code 0 means success (healthy).
+      # A nonzero exit code means the check failed (unhealthy).
+      #
+      # The marker file must be created by your MariaDB
+      # initialization script when provisioning is complete.
+
+      # Run the health check every 2 seconds.
+      interval: 2s
+
+      # Each health check must finish within 3 seconds.
+      timeout: 3s
+
+      # Mark unhealthy after 30 consecutive failures,
+      # subject to the start-period behavior.
+      retries: 30
+
+      # Allow 30 seconds for startup.
+      # Failures during this period do not count toward retries.
+      # A successful check ends the grace period early.
+      start_period: 30s
+
+  # WordPress: PHP-FPM application server
+  wordpress:
+
+    # Name and tag of the custom WordPress image.
+    image: wordpress:inception
+
+    # Do not pull the image from a remote registry.
+    pull_policy: never
+
+    # Build the image using the Dockerfile in this directory.
+    build: ./requirements/wordpress
+
+    # Restart automatically unless manually stopped.
+    restart: unless-stopped
+
+    # Pass database connection settings to the container.
+    environment:
+
+      # Database hostname.
+      # Docker's internal DNS resolves "mariadb" to the MariaDB
+      # container on the shared inception network.
+      DB_HOST: mariadb
+
+      # Database name read from the .env file.
+      DB_NAME: ${DB_NAME:?Set DB_NAME in srcs/.env}
+
+      # Database username read from the .env file.
+      DB_USER: ${DB_USER:?Set DB_USER in srcs/.env}
+
+      # Path where the application expects to read its password.
+      # This variable does not contain the password itself.
+      DB_PASSWORD_FILE: /run/credentials/db_password
+
+    # Mount the database password secret.
+    secrets: [db_password]
+
+    # Mount persistent website storage.
+    volumes:
+
+      # Mount the website volume at /var/www/html.
+      # This directory normally contains WordPress files,
+      # plugins, themes, uploads, and other website content.
+      - website:/var/www/html
+
+    # Connect WordPress to the same internal network as MariaDB.
+    networks: [inception]
+
+    # Control the order and readiness of service startup.
+    depends_on:
+
+      # WordPress depends on MariaDB.
+      mariadb:
+
+        # Wait until MariaDB's healthcheck reports "healthy"
+        # before starting WordPress.
+        condition: service_healthy
+
+    # Check whether the PHP-FPM application is responding.
+    healthcheck:
+
+      # Run the following shell command inside WordPress.
+      test:
+        - CMD-SHELL
+        - >-
+          SCRIPT_FILENAME=/var/www/html/health.php REQUEST_METHOD=GET
+          cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q '"status":"ok"'
+
+      # Explanation:
+      # 1. SCRIPT_FILENAME: Specify the PHP script to execute.
+      # 2. REQUEST_METHOD=GET: Simulate an HTTP GET request.
+      # 3. cgi-fcgi: Send a FastCGI request to PHP-FPM.
+      # 4. -bind -connect: Connect to an existing FastCGI server.
+      # 5. 127.0.0.1:9000: PHP-FPM listening on local port 9000.
+      # 6. |: Send the output to the next command.
+      # 7. grep -q: Quietly search for the expected response.
+      # 8. '"status":"ok"': Expected text in the response.
+      #
+      # The health.php file must exist and return the expected
+      # output for this health check to succeed.
+
+      # Execute the health check every 2 seconds.
+      interval: 2s
+
+      # Give each check up to 5 seconds to complete.
+      timeout: 5s
+
+      # Mark unhealthy after 15 consecutive failed checks.
+      retries: 15
+
+  # NGINX: HTTPS web server and reverse proxy
+  nginx:
+
+    # Name and tag of our custom NGINX image.
+    image: nginx:inception
+
+    # Only use a locally built or available image.
+    pull_policy: never
+
+    # Build NGINX from its Dockerfile directory.
+    build: ./requirements/nginx
+
+    # Restart automatically unless manually stopped.
+    restart: unless-stopped
+
+    # Pass the domain name into the NGINX container.
+    environment:
+
+      # Read the domain name from the .env file.
+      DOMAIN_NAME: ${DOMAIN_NAME:?Set DOMAIN_NAME in srcs/.env}
+
+    # Publish container ports to the host machine.
+    ports:
+
+      # Map host port 443 to container port 443.
+      # Format: "HOST_PORT:CONTAINER_PORT"
+      # This allows HTTPS connections to reach NGINX.
+      - "443:443"
+
+    # Mount the website files.
+    volumes:
+
+      # Share the WordPress website volume with NGINX.
+      # :ro means read-only.
+      # NGINX can read the files but cannot modify them
+      # through this mount.
+      - website:/var/www/html:ro
+
+    # Connect NGINX to the same inception network.
+    networks: [inception]
+
+    # Make NGINX depend on WordPress readiness.
+    depends_on:
+
+      wordpress:
+
+        # Start NGINX only after WordPress becomes healthy.
+        condition: service_healthy
+
+    # Check whether NGINX responds to HTTPS requests.
+    healthcheck:
+
+      # Run curl inside the NGINX container.
+      test:
+        - CMD
+        - curl
+        - --noproxy
+        - "*"
+        - -fkSs
+        - https://127.0.0.1/health.php
+
+      # Explanation:
+      # curl: Send an HTTP/HTTPS request.
+      # --noproxy "*": Do not use a proxy for this request.
+      # -f: Fail for HTTP 400/500 error responses.
+      # -k: Accept a self-signed or otherwise untrusted certificate.
+      # -S: Show errors when operating silently.
+      # -s: Enable silent mode.
+      # https://127.0.0.1/health.php: Local HTTPS health endpoint.
+      #
+      # The command succeeds if curl completes successfully.
+      # It does not check whether the body contains "status":"ok".
+
+      # Execute a check every 2 seconds.
+      interval: 2s
+
+      # Allow up to 5 seconds for each check.
+      timeout: 5s
+
+      # Mark unhealthy after 15 consecutive failures.
+      retries: 15
+
+# Networks: Communication between containers
+networks:
+
+  # Logical name of the network used by the services.
+  inception:
+
+    # Create a user-defined bridge network.
+    # Containers connected to this network can communicate
+    # using service names such as "mariadb" and "wordpress".
+    #
+    # The network is isolated from other Docker networks
+    # by default, but it is not disconnected from the internet.
+    driver: bridge
+
+# Volumes: Persistent data storage
+volumes:
+
+  # Named volume for MariaDB database files.
+  database:
+
+    # Explicit Docker volume name.
+    # Prevents Compose from automatically prefixing
+    # this volume name with the project name.
+    name: inception_database
+
+  # Named volume for WordPress website files.
+  website:
+
+    # Explicit Docker volume name.
+    name: inception_website
+
+  # Docker manages the storage location for these volumes.
+  # Their host paths depend on Docker's configured data-root.
+  # They are not explicitly mapped to host directories here.
+
+# Secrets: Sensitive configuration data
+secrets:
+
+  # Define a secret containing the database password.
+  db_password:
+
+    # Read the password from this file on the host.
+    # The path is relative to the Compose file directory.
+    file: ../secrets/db_password.txt
+
+    # Compose makes this secret available only to services
+    # that explicitly request it using "secrets".

@@ -1,0 +1,7 @@
+# Local settings and credentials must never enter Git.
+srcs/.env
+secrets/
+__pycache__/
+*.pyc
+
+roadmap/
