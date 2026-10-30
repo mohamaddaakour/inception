@@ -41,14 +41,13 @@ mkdir -p /run/php /run/credentials /var/www/html /tmp/wp-cli-cache
 # Give PHP workers a private, readable copy of the database secret.
 install -o www-data -g www-data -m 400 /run/secrets/db_password "$DB_PASSWORD_FILE"
 
-# volume contains only health.php, so seed the WordPress tree.
-# On later starts leave existing WordPress files and uploads intact.
+# Install application files only when the website volume is empty of WordPress.
 if [ ! -f /var/www/html/wp-includes/version.php ]; then
     cp -a /opt/wordpress/. /var/www/html/
 fi
 
 # Generate persistent login-session keys once, without calling an external API.
-if [ ! -f /var/www/html/.inception-salts.php ]; then
+if [ ! -s /var/www/html/.inception-salts.php ]; then
     php -r '
         $code = "<?php\n";
         foreach (["AUTH_KEY", "SECURE_AUTH_KEY", "LOGGED_IN_KEY", "NONCE_KEY",
@@ -56,14 +55,18 @@ if [ ! -f /var/www/html/.inception-salts.php ]; then
             $code .= "define(" . var_export($name, true) . ", "
                   . var_export(bin2hex(random_bytes(64)), true) . ");\n";
         }
-        file_put_contents("/var/www/html/.inception-salts.php", $code);
+        $temporary = "/var/www/html/.inception-salts.php.tmp";
+        if (file_put_contents($temporary, $code) === false
+            || !chmod($temporary, 0640)
+            || !rename($temporary, "/var/www/html/.inception-salts.php")) {
+            fwrite(STDERR, "Cannot install authentication keys\n");
+            exit(1);
+        }
     '
 fi
 # Configuration always reads secrets and DB settings from runtime files/env.
-install -m 640 /opt/inception/wp-config.php /var/www/html/wp-config.php
-
-# Preserve the diagnostic endpoint in the shared website volume.
-install -m 644 /opt/inception/health.php /var/www/html/health.php
+install -m 640 /opt/inception/wp-config.php /var/www/html/.wp-config.php.tmp
+mv -f /var/www/html/.wp-config.php.tmp /var/www/html/wp-config.php
 
 # Let PHP manage website files and restrict access to authentication salts.
 chown -R www-data:www-data /var/www/html /tmp/wp-cli-cache
@@ -73,11 +76,19 @@ chmod 640 /var/www/html/.inception-salts.php
 export WP_CLI_CACHE_DIR=/tmp/wp-cli-cache
 
 # Execute application provisioning as the same unprivileged user as PHP workers.
-wp() { runuser -u www-data -- /usr/local/bin/wp --path=/var/www/html "$@"; }
+wp() { runuser -u www-data -- /usr/local/bin/wp --path=/var/www/html --url="https://$DOMAIN_NAME" "$@"; }
 # Compose waits on MariaDB too, but this bounded check verifies app credentials.
 ready=no
 for attempt in $(seq 1 30); do
-    if php /opt/inception/health.php | grep -q '"status":"ok"'; then
+    if php -r '
+        try {
+            $secret = rtrim(file_get_contents(getenv("DB_PASSWORD_FILE")), "\r\n");
+            $db = new PDO("mysql:host=" . getenv("DB_HOST") . ";dbname=" . getenv("DB_NAME"),
+                getenv("DB_USER"), $secret,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 2]);
+            $db->query("SELECT 1");
+        } catch (Throwable $error) { exit(1); }
+    '; then
         ready=yes
         break
     fi

@@ -1,33 +1,31 @@
-# Define the Compose command, using our environment file and stack configuration.
+# Use the local environment and Compose configuration.
 COMPOSE = docker compose --env-file srcs/.env -f srcs/docker-compose.yml
-
-# Run the up target when make is called without a target.
 .DEFAULT_GOAL := up
+.PHONY: all up down stop status logs config
 
-# Treat these names as commands, even if files with the same names exist.
-.PHONY: up down stop status logs config
+# Build and start the complete application.
+all: up
 
-# Build and start the application using docker-compose.
+# Build images and wait for the services to become ready.
 up:
-	$(COMPOSE) up --build -d --wait --wait-timeout 180
+	$(COMPOSE) up --build -d --wait --wait-timeout 240
 
-# Remove the application's containers and network while keeping named volumes.
+# Remove containers and the network while retaining named volumes.
 down:
 	$(COMPOSE) down
 
-# Stop the application while keeping its containers for later reuse.
+# Stop containers without removing them.
 stop:
 	$(COMPOSE) stop
 
-# Display the current state of the application.
-# List the service active containers, their status, and their ports.
+# Display service health and published ports.
 status:
 	$(COMPOSE) ps
 
-# Display recent application logs.
+# Display recent service logs.
 logs:
 	$(COMPOSE) logs --tail=100
 
-# Check the Compose configuration before starting the application.
+# Validate the resolved Compose configuration.
 config:
 	$(COMPOSE) config --quiet

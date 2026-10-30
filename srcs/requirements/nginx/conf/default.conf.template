@@ -1,7 +1,7 @@
 # Serve the WordPress website over HTTPS.
 server {
     # Accept encrypted connections on the project's only public port.
-    listen 443 ssl;
+    listen 443 ssl default_server;
 
     # The entrypoint replaces this placeholder with your configured domain.
     server_name ${DOMAIN_NAME};
@@ -19,8 +19,8 @@ server {
     # Use WordPress's front controller when a directory is requested.
     index index.php;
 
-    # Allow request bodies up to 16 MB; PHP also has separate upload limits.
-    client_max_body_size 16m;
+    # Accept the same maximum request size as PHP.
+    client_max_body_size 20m;
 
     # Block direct requests for WordPress's configuration file.
     location = /wp-config.php {
@@ -43,7 +43,11 @@ server {
         try_files $uri $uri/ /index.php?$args;
     }
 
-    # Send PHP scripts, including health.php, to the PHP-FPM container.
+    # Refresh Docker DNS when an application container is replaced.
+    resolver 127.0.0.11 valid=5s ipv6=off;
+    set $php_backend wordpress:9000;
+
+    # Send PHP scripts to the PHP-FPM container.
     location ~ \.php$ {
         # Reject nonexistent scripts before contacting PHP-FPM.
         try_files $uri =404;
@@ -61,6 +65,6 @@ server {
         fastcgi_param HTTP_PROXY "";
 
         # Resolve the WordPress service through Docker DNS and connect to FPM.
-        fastcgi_pass wordpress:9000;
+        fastcgi_pass $php_backend;
     }
 }

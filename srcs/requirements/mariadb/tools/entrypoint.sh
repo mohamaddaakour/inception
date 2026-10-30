@@ -4,7 +4,7 @@
 set -eu
 
 # Validate the configuration and database password secret.
- /usr/local/bin/validate-config /run/secrets/db_password
+/usr/local/bin/validate-config /run/secrets/db_password
 
 # Create MariaDB directories and give ownership to the mysql user.
 mkdir -p /run/mysqld /var/lib/mysql
@@ -46,13 +46,10 @@ if [ ! -f /var/lib/mysql/.inception-ready ]; then
     # Read the database password from the Docker secret file.
     password=$(cat /run/secrets/db_password)
 
-    # Execute SQL statements through the local Unix socket.
-    # Create the database and user, update the password, and grant permissions.
-    # DB_NAME, DB_USER, and password must be safely validated/escaped for SQL.
-    mariadb --protocol=socket -uroot <<SQL
+        # Create missing resources without resetting existing credentials.
+        mariadb --protocol=socket -uroot <<SQL
 CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;
 CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$password';
-ALTER USER '$DB_USER'@'%' IDENTIFIED BY '$password';
 GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'%';
 SQL
 
@@ -73,7 +70,5 @@ SQL
 fi
 
 # Start the permanent MariaDB server.
-# exec replaces the shell process with MariaDB, making it PID 1
-# during normal container startup.
-# 0.0.0.0 allows connections through all container IPv4 interfaces.
+# Run the real server as PID 1 and accept connections on the Docker network.
 exec mariadbd --user=mysql --datadir=/var/lib/mysql --bind-address=0.0.0.0

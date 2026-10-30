@@ -22,16 +22,19 @@ services:
     # Always restart the container unless we stopped it manually.
     restart: unless-stopped
 
+    # Allow the service time to shut down cleanly.
+    stop_grace_period: 30s
+
     # Define environment variables available inside the container.
     environment:
 
       # Read DB_NAME from the .env file and pass it to the container.
       # If it is missing or empty, Compose stops with the given error.
-      DB_NAME: ${DB_NAME:?Set DB_NAME in srcs/.env}
+      DB_NAME: ${DB_NAME:?Set DB_NAME}
 
       # Read the database username from the .env file.
       # The :? syntax requires a nonempty value.
-      DB_USER: ${DB_USER:?Set DB_USER in srcs/.env}
+      DB_USER: ${DB_USER:?Set DB_USER}
 
     # Make the db_password secret available inside the container.
     secrets: [db_password]
@@ -75,15 +78,15 @@ services:
       # The marker file must be created by your MariaDB
       # initialization script when provisioning is complete.
 
-      # Run the health check every 2 seconds.
-      interval: 2s
+      # Run the health check every 5 seconds.
+      interval: 5s
 
       # Each health check must finish within 3 seconds.
       timeout: 3s
 
-      # Mark unhealthy after 30 consecutive failures,
+      # Mark unhealthy after 20 consecutive failures,
       # subject to the start-period behavior.
-      retries: 30
+      retries: 20
 
       # Allow 30 seconds for startup.
       # Failures during this period do not count toward retries.
@@ -105,6 +108,9 @@ services:
     # Restart automatically unless manually stopped.
     restart: unless-stopped
 
+    # Allow the service time to shut down cleanly.
+    stop_grace_period: 30s
+
     # Pass database connection settings to the container.
     environment:
 
@@ -114,10 +120,10 @@ services:
       DB_HOST: mariadb
 
       # Database name read from the .env file.
-      DB_NAME: ${DB_NAME:?Set DB_NAME in srcs/.env}
+      DB_NAME: ${DB_NAME:?Set DB_NAME}
 
       # Database username read from the .env file.
-      DB_USER: ${DB_USER:?Set DB_USER in srcs/.env}
+      DB_USER: ${DB_USER:?Set DB_USER}
 
       # Path where the application expects to read its password.
       # This variable does not contain the password itself.
@@ -161,30 +167,31 @@ services:
       test:
         - CMD-SHELL
         - >-
-          SCRIPT_FILENAME=/var/www/html/health.php REQUEST_METHOD=GET
-          cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q '"status":"ok"'
+          SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_URI=/ping REQUEST_METHOD=GET
+          cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong
 
       # Explanation:
-      # 1. SCRIPT_FILENAME: Specify the PHP script to execute.
-      # 2. REQUEST_METHOD=GET: Simulate an HTTP GET request.
-      # 3. cgi-fcgi: Send a FastCGI request to PHP-FPM.
-      # 4. -bind -connect: Connect to an existing FastCGI server.
-      # 5. 127.0.0.1:9000: PHP-FPM listening on local port 9000.
-      # 6. |: Send the output to the next command.
-      # 7. grep -q: Quietly search for the expected response.
-      # 8. '"status":"ok"': Expected text in the response.
+      # 1. SCRIPT_NAME and SCRIPT_FILENAME: Select PHP-FPM's internal ping handler.
+      # 2. REQUEST_URI=/ping: Specify the internal readiness path.
+      # 3. REQUEST_METHOD=GET: Simulate an HTTP GET request.
+      # 4. cgi-fcgi: Send a FastCGI request to PHP-FPM.
+      # 5. -bind -connect: Connect to the existing FastCGI server.
+      # 6. 127.0.0.1:9000: PHP-FPM's local listener.
+      # 7. grep -q pong: Succeed only when the ping response is received.
       #
-      # The health.php file must exist and return the expected
-      # output for this health check to succeed.
+      # The ping handler is internal; no public diagnostic file is needed.
 
-      # Execute the health check every 2 seconds.
-      interval: 2s
+      # Execute the health check every 5 seconds.
+      interval: 5s
 
       # Give each check up to 5 seconds to complete.
       timeout: 5s
 
-      # Mark unhealthy after 15 consecutive failed checks.
-      retries: 15
+      # Mark unhealthy after 20 consecutive failed checks.
+      retries: 20
+
+      # Allow extra time for initial WordPress installation.
+      start_period: 30s
 
   # NGINX: HTTPS web server and reverse proxy
   nginx:
@@ -201,11 +208,14 @@ services:
     # Restart automatically unless manually stopped.
     restart: unless-stopped
 
+    # Allow NGINX time to finish active requests.
+    stop_grace_period: 15s
+
     # Pass the domain name into the NGINX container.
     environment:
 
       # Read the domain name from the .env file.
-      DOMAIN_NAME: ${DOMAIN_NAME:?Set DOMAIN_NAME in srcs/.env}
+      DOMAIN_NAME: ${DOMAIN_NAME:?Set DOMAIN_NAME}
 
     # Publish container ports to the host machine.
     ports:
@@ -240,27 +250,27 @@ services:
 
       # Run curl inside the NGINX container.
       test:
-        - CMD
-        - curl
-        - --noproxy
-        - "*"
-        - -fkSs
-        - https://127.0.0.1/health.php
+        - CMD-SHELL
+        - >-
+          curl --noproxy '*' -fkSs --max-time 4
+          --resolve "$${DOMAIN_NAME}:443:127.0.0.1"
+          "https://$${DOMAIN_NAME}/" >/dev/null
 
       # Explanation:
-      # curl: Send an HTTP/HTTPS request.
-      # --noproxy "*": Do not use a proxy for this request.
+      # curl: Send an HTTPS request to the actual website.
+      # --noproxy '*': Do not use a proxy for this request.
       # -f: Fail for HTTP 400/500 error responses.
-      # -k: Accept a self-signed or otherwise untrusted certificate.
-      # -S: Show errors when operating silently.
-      # -s: Enable silent mode.
-      # https://127.0.0.1/health.php: Local HTTPS health endpoint.
+      # -k: Accept the local self-signed certificate.
+      # -S and -s: Show errors without progress output.
+      # --max-time 4: Limit the request to four seconds.
+      # --resolve: Reach local NGINX while retaining the configured hostname.
+      # $$: Let the container shell expand the variable instead of Compose.
+      # >/dev/null: Discard the page body.
       #
-      # The command succeeds if curl completes successfully.
-      # It does not check whether the body contains "status":"ok".
+      # A successful response confirms the website is reachable through NGINX.
 
-      # Execute a check every 2 seconds.
-      interval: 2s
+      # Execute a check every 5 seconds.
+      interval: 5s
 
       # Allow up to 5 seconds for each check.
       timeout: 5s

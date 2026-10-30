@@ -13,8 +13,6 @@ require __DIR__ . '/.inception-salts.php';
 define('WP_DEBUG', false);
 define('FORCE_SSL_ADMIN', true);
 
-// Prevent editing PHP source from the dashboard. Uploading media still works.
-define('DISALLOW_FILE_EDIT', true);
 if (!defined('ABSPATH')) {
     define('ABSPATH', __DIR__ . '/');
 }

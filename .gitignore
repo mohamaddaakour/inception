@@ -1,7 +1,3 @@
-# Local settings and credentials must never enter Git.
+# Keep local configuration and credentials out of Git.
 srcs/.env
 secrets/
-__pycache__/
-*.pyc
-
-roadmap/
