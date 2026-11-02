@@ -3,6 +3,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     php8.2-fpm php8.2-cli php8.2-mysql php8.2-curl php8.2-gd \
     php8.2-mbstring php8.2-xml php8.2-zip php8.2-intl \
+    php8.2-redis \
     libfcgi-bin ca-certificates curl unzip util-linux \
     && rm -rf /var/lib/apt/lists/*
 
@@ -27,9 +28,20 @@ RUN mkdir -p /opt/wordpress \
     && wp --allow-root --path=/opt/wordpress core verify-checksums \
        --version="${WP_VERSION}" --locale=en_US
 
+# Download and verify pinned Redis Object Cache plugin into the image.
+ARG REDIS_CACHE_VERSION=3.0.0
+ARG REDIS_CACHE_SHA256=7a03342d3defbe94cac8d0470b42dc1a1c34331b19c47205df20ceccd3c8f54a
+RUN mkdir -p /opt/plugins \
+    && curl -fsSL --retry 3 \
+       "https://downloads.wordpress.org/plugin/redis-cache.${REDIS_CACHE_VERSION}.zip" \
+       -o /opt/plugins/redis-cache.zip \
+    && echo "${REDIS_CACHE_SHA256}  /opt/plugins/redis-cache.zip" | sha256sum -c -
+
 COPY conf/www.conf /etc/php/8.2/fpm/pool.d/www.conf
 
 COPY conf/wp-config.php /opt/inception/wp-config.php
+
+COPY tools/health.php /opt/inception/health.php
 
 COPY tools/entrypoint.sh /usr/local/bin/entrypoint
 

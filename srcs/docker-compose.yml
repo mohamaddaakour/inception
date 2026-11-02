@@ -92,6 +92,59 @@ services:
       # Failures during this period do not count toward retries.
       # A successful check ends the grace period early.
       start_period: 30s
+  
+  redis:
+    # Custom Redis caching server built from Debian (bonus requirements).
+    image: redis:inception
+
+    # Never download this image from a remote registry.
+    pull_policy: never
+
+    # Path to the directory containing the Redis Dockerfile.
+    build: ./requirements/bonus/redis
+
+    # Always restart the container unless we stopped it manually.
+    restart: unless-stopped
+
+    # Allow the service time to persist in-flight client data.
+    stop_grace_period: 10s
+
+    # Make the redis_password secret available inside the container.
+    secrets: [redis_password]
+
+    # Connect Redis to the internal inception network only.
+    # Port 6379 is deliberately NOT published to the host machine:
+    # only NGINX publishes port 443 in this project.
+    networks: [inception]
+
+    # Define how Docker checks whether Redis is healthy.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          redis-cli --no-auth-warning -a "$$(cat /run/secrets/redis_password)" ping | grep -q PONG
+
+      # 1. cat: Read the Redis password secret.
+      # 2. -a: Authenticate redis-cli with that password.
+      # 3. --no-auth-warning: Suppress the harmless CLI warning
+      #    about passing a password on the command line.
+      # 4. ping: Ask Redis for a response.
+      # 5. grep -q PONG: Succeed only when Redis answers PONG.
+      #
+      # A wrong or missing password makes this check fail,
+      # which verifies authentication is really enforced.
+
+      # Run the health check every 5 seconds.
+      interval: 5s
+
+      # Each health check must finish within 3 seconds.
+      timeout: 3s
+
+      # Mark unhealthy after 20 consecutive failures.
+      retries: 20
+
+      # Allow 10 seconds for startup.
+      start_period: 10s
 
   # WordPress: PHP-FPM application server
   wordpress:
@@ -136,8 +189,16 @@ services:
       WP_USER: ${WP_USER:?Set WP_USER}
       WP_USER_EMAIL: ${WP_USER_EMAIL:?Set WP_USER_EMAIL}
 
-    # Mount the database passwords secrets.
-    secrets: [db_password, wp_admin_password, wp_user_password]
+      # Redis object cache hostname and port inside the compose network.
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+
+      # Path where PHP workers expect to read the Redis password.
+      # This variable does not contain the password itself.
+      REDIS_PASSWORD_FILE: /run/credentials/redis_password
+
+    # Mount the database, account, and Redis password secrets.
+    secrets: [db_password, wp_admin_password, wp_user_password, redis_password]
 
     # Mount persistent website storage.
     volumes:
@@ -158,6 +219,13 @@ services:
 
         # Wait until MariaDB's healthcheck reports "healthy"
         # before starting WordPress.
+        condition: service_healthy
+
+      # WordPress also depends on Redis for object caching.
+      redis:
+
+        # Wait until Redis's healthcheck reports "healthy",
+        # which also proves password authentication works.
         condition: service_healthy
 
     # Check whether the PHP-FPM application is responding.
@@ -333,3 +401,7 @@ secrets:
   # Provide the password used when creating the WordPress subscriber.
   wp_user_password:
     file: ./secrets/wp_user_password.txt
+
+  # Provide the password protecting the Redis caching service.
+  redis_password:
+    file: ./secrets/redis_password.txt

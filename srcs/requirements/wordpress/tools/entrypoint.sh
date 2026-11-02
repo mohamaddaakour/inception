@@ -7,6 +7,7 @@ set -eu
 : "${DB_HOST:?}" "${DB_NAME:?}" "${DB_USER:?}" "${DB_PASSWORD_FILE:?}"
 : "${DOMAIN_NAME:?}" "${WP_TITLE:?}" "${WP_ADMIN_USER:?}" "${WP_ADMIN_EMAIL:?}"
 : "${WP_USER:?}" "${WP_USER_EMAIL:?}"
+: "${REDIS_HOST:=redis}" "${REDIS_PORT:=6379}" "${REDIS_PASSWORD_FILE:=/run/credentials/redis_password}"
 
 # Allow only supported characters and lengths in the two account names.
 for name in "$WP_ADMIN_USER" "$WP_USER"; do
@@ -25,7 +26,8 @@ esac
 [ "$WP_ADMIN_EMAIL" != "$WP_USER_EMAIL" ] || { echo 'Use two distinct emails' >&2; exit 1; }
 
 # Keep the same simple password format; never log the contents.
-for file in /run/secrets/db_password /run/secrets/wp_admin_password /run/secrets/wp_user_password; do
+# All four secrets (database, the two accounts, and Redis) must qualify.
+for file in /run/secrets/db_password /run/secrets/wp_admin_password /run/secrets/wp_user_password /run/secrets/redis_password; do
     password=$(cat "$file")
     case "$password" in
         ''|*[!a-fA-F0-9]*) echo 'Secrets must contain 64 hexadecimal characters' >&2; exit 1 ;;
@@ -38,8 +40,9 @@ unset password
 # Create runtime, website, and WP-CLI cache directories.
 mkdir -p /run/php /run/credentials /var/www/html /tmp/wp-cli-cache
 
-# Give PHP workers a private, readable copy of the database secret.
+# Give PHP workers a private, readable copy of the database and Redis secrets.
 install -o www-data -g www-data -m 400 /run/secrets/db_password "$DB_PASSWORD_FILE"
+install -o www-data -g www-data -m 400 /run/secrets/redis_password "$REDIS_PASSWORD_FILE"
 
 # Install application files only when the website volume is empty of WordPress.
 if [ ! -f /var/www/html/wp-includes/version.php ]; then
@@ -67,6 +70,9 @@ fi
 # Configuration always reads secrets and DB settings from runtime files/env.
 install -m 640 /opt/inception/wp-config.php /var/www/html/.wp-config.php.tmp
 mv -f /var/www/html/.wp-config.php.tmp /var/www/html/wp-config.php
+
+# Install the diagnostic health endpoint, checking the real database.
+install -m 644 /opt/inception/health.php /var/www/html/health.php
 
 # Let PHP manage website files and restrict access to authentication salts.
 chown -R www-data:www-data /var/www/html /tmp/wp-cli-cache
@@ -96,6 +102,32 @@ for attempt in $(seq 1 30); do
 done
 [ "$ready" = yes ] || { echo 'Application database connection failed' >&2; exit 1; }
 
+# Check Redis connectivity and authentication with bounded retries.
+redis_ready=no
+for attempt in $(seq 1 30); do
+    if php -r '
+        try {
+            $secret = rtrim(file_get_contents(getenv("REDIS_PASSWORD_FILE")), "\r\n");
+            $redis = new Redis();
+            if (!$redis->connect(getenv("REDIS_HOST"), (int)(getenv("REDIS_PORT") ?: 6379), 2)) {
+                exit(1);
+            }
+            if (!$redis->auth($secret)) {
+                exit(1);
+            }
+            $pong = $redis->ping();
+            if ($pong !== "+PONG" && $pong !== true && $pong !== "PONG") {
+                exit(1);
+            }
+        } catch (Throwable $error) { exit(1); }
+    '; then
+        redis_ready=yes
+        break
+    fi
+    sleep 1
+done
+[ "$redis_ready" = yes ] || { echo 'Redis cache connection failed' >&2; exit 1; }
+
 # Install the website and administrator only when WordPress is not installed.
 if ! wp core is-installed; then
     # Read passwords from stdin; quiet mode suppresses WP-CLI echoing prompted arguments.
@@ -113,6 +145,21 @@ fi
 wp user list --role=administrator --field=user_login | grep -Fxq -- "$WP_ADMIN_USER"
 wp user list --role=subscriber --field=user_login | grep -Fxq -- "$WP_USER"
 
+# Install the Redis Object Cache plugin from the verified in-image archive.
+if ! wp plugin is-installed redis-cache; then
+    wp plugin install /opt/plugins/redis-cache.zip --activate
+fi
+if ! wp plugin is-active redis-cache; then
+    wp plugin activate redis-cache
+fi
+
+# Ensure the object-cache drop-in is active, using the plugin's copy as fallback.
+if [ ! -f /var/www/html/wp-content/object-cache.php ]; then
+    wp redis enable --force \
+        || cp -f /var/www/html/wp-content/plugins/redis-cache/includes/object-cache.php \
+            /var/www/html/wp-content/object-cache.php
+fi
+
 # Hand control to the foreground PHP server so it becomes PID 1.
-echo 'WordPress is ready; starting PHP-FPM.'
+echo 'WordPress and Redis cache are ready; starting PHP-FPM.'
 exec php-fpm8.2 --nodaemonize
