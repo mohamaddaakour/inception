@@ -1,0 +1,7 @@
+# Ship only the files the image build actually references.
+*
+!Dockerfile
+!conf
+!conf/**
+!tools
+!tools/**

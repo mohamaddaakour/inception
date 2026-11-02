@@ -2,7 +2,7 @@
 
 ## Provided services
 
-The stack provides a WordPress website and administration dashboard. NGINX accepts HTTPS connections, PHP-FPM executes WordPress, and MariaDB stores the database. Only port 443 is published. No bonus services are included.
+The stack provides a WordPress website and administration dashboard. NGINX accepts HTTPS connections, PHP-FPM executes WordPress, MariaDB stores the database, and Redis caches repeated database queries in memory so repeated page views use less database work. Only port 443 is published.
 
 ## Start and stop
 
@@ -43,6 +43,7 @@ Read initial passwords privately from:
 | `srcs/secrets/wp_admin_password.txt` | WordPress administrator password |
 | `srcs/secrets/wp_user_password.txt` | WordPress subscriber password |
 | `srcs/secrets/db_password.txt` | Application's SQL connection password |
+| `srcs/secrets/redis_password.txt` | Redis cache authentication password |
 
 The secret directory should have permission `700`; password files and `.env` should have permission `600`. They are ignored by Git. Never share them in commits, screenshots, or logs.
 
@@ -58,7 +59,7 @@ make status
 make logs
 ```
 
-All three services should be healthy. In a browser:
+All four services should be healthy. In a browser:
 
 1. Sign in as administrator and publish a post.
 2. Upload a small image and confirm it appears publicly.
@@ -66,6 +67,6 @@ All three services should be healthy. In a browser:
 4. Sign in as subscriber and confirm publishing, plugin installation, and user management are unavailable.
 5. Run `make down`, then `make up`; confirm both accounts, the post, and image remain.
 
-`3306/tcp` and `9000/tcp` in status output are internal ports when no host mapping is shown. NGINX alone should show `443->443`.
+`3306/tcp`, `9000/tcp`, and `6379/tcp` in status output are internal ports when no host mapping is shown. NGINX alone should show `443->443`.
 
 For connection problems, check the VM IP, hosts entry, port 443, and service status. For certificate warnings, verify the address before accepting the local exception. For HTTP 502/503 errors, inspect application/database logs. Do not delete persistent storage to resolve a configuration error.

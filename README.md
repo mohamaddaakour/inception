@@ -4,7 +4,7 @@
 
 ## Description
 
-Inception runs a WordPress website inside a Linux virtual machine using three custom Docker images: NGINX, WordPress with PHP-FPM, and MariaDB. NGINX is the only public entrypoint, on HTTPS port 443 with TLS 1.2 or TLS 1.3. Two named volumes preserve the database and website files.
+Inception runs a WordPress website inside a Linux virtual machine using four custom Docker images: NGINX, WordPress with PHP-FPM, MariaDB, and Redis. NGINX is the only public entrypoint, on HTTPS port 443 with TLS 1.2 or TLS 1.3. Two named volumes preserve the database and website files, and Redis caches repeat database queries in memory.
 
 ## Instructions
 
@@ -19,10 +19,11 @@ chmod 700 srcs/secrets
 (umask 077; test -e srcs/secrets/db_password.txt || openssl rand -hex 32 > srcs/secrets/db_password.txt)
 (umask 077; test -e srcs/secrets/wp_admin_password.txt || openssl rand -hex 32 > srcs/secrets/wp_admin_password.txt)
 (umask 077; test -e srcs/secrets/wp_user_password.txt || openssl rand -hex 32 > srcs/secrets/wp_user_password.txt)
+(umask 077; test -e srcs/secrets/redis_password.txt || openssl rand -hex 32 > srcs/secrets/redis_password.txt)
 chmod 600 srcs/.env srcs/secrets/*.txt
 ```
 
-Edit `srcs/.env` with your domain, database settings, and two distinct WordPress account identities. The administrator username must not contain `admin` in any capitalization. Preserve existing secrets when restarting an installed site.
+Edit `srcs/.env` with your domain, database settings, and two distinct WordPress account identities. The administrator username must not contain `admin` in any capitalization. Redis host and port default to `redis` and `6379`. Preserve existing secrets when restarting an installed site.
 
 On the browsing machine, map `<VM-IP> <login>.42.fr` in the hosts file. Use `127.0.0.1` when the browser runs inside the Docker VM.
 
@@ -60,6 +61,8 @@ WordPress and WP-CLI versions are pinned in the WordPress Dockerfile. The CLI do
 
 Docker stores the named volumes beneath `/home/<login>/data/volumes/`. The database volume appears at `/var/lib/mysql` in MariaDB; the website volume appears at `/var/www/html` in WordPress and read-only in NGINX. Each mount accesses the same underlying data, not a synchronized copy.
 
+The Redis caching service runs in its own container built from Debian. WordPress reaches it through the PHP Redis extension and the official Redis Object Cache plugin, whose downloaded archive is pinned and verified with SHA-256. Redis listens only inside the bridge network, a shared password from a Compose secret protects every command, and captured keys stay within a 256 MB least-recently-used limit. The cache holds results in memory only; it is intentionally not persisted and is rebuilt as requests arrive after a restart.
+
 ## Resources
 
 - [Docker installation](https://docs.docker.com/engine/install/debian/)
@@ -73,5 +76,8 @@ Docker stores the named volumes beneath `/home/<login>/data/volumes/`. The datab
 - [WordPress releases](https://wordpress.org/download/releases/)
 - [WP-CLI installation](https://make.wordpress.org/cli/handbook/guides/installing/)
 - [WP-CLI extraction issue](https://github.com/wp-cli/core-command/issues/347)
+- [Redis documentation](https://redis.io/docs/latest/)
+- [PhpRedis extension](https://github.com/phpredis/phpredis)
+- [Redis Object Cache for WordPress](https://wordpress.org/plugins/redis-cache/)
 
 AI assisted with Dockerfiles, startup scripts, documentation and troubleshooting.
