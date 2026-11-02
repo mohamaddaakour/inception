@@ -1,6 +1,6 @@
 # Serve the WordPress website over HTTPS.
 server {
-    # Accept encrypted connections on the project's only public port.
+    # Accept HTTPS connections on port 443.
     listen 443 ssl default_server;
 
     # The entrypoint replaces this placeholder with your configured domain.
@@ -13,13 +13,13 @@ server {
     # Allow only the TLS versions required by the subject.
     ssl_protocols TLSv1.2 TLSv1.3;
 
-    # Read website files from the shared WordPress named volume.
+    # Where NGINX finds your WordPress files (this is a volume).
     root /var/www/html;
 
     # Use WordPress's front controller when a directory is requested.
     index index.php;
 
-    # Accept the same maximum request size as PHP.
+    # Allow requests up to 20 MB, such as file uploads.
     client_max_body_size 20m;
 
     # Block direct requests for WordPress's configuration file.

@@ -1,5 +1,4 @@
 # Set the name of the Docker Compose project to "inception".
-# Docker Compose uses this name to group and identify project resources.
 name: inception
 
 # Define the containers (services) that make up our application.
@@ -22,7 +21,8 @@ services:
     # Always restart the container unless we stopped it manually.
     restart: unless-stopped
 
-    # Allow the service time to shut down cleanly.
+    # controls how long Docker patiently waits for
+    # a process to shut down cleanly before killing it by force.
     stop_grace_period: 30s
 
     # Define environment variables available inside the container.
@@ -32,8 +32,6 @@ services:
       # If it is missing or empty, Compose stops with the given error.
       DB_NAME: ${DB_NAME:?Set DB_NAME}
 
-      # Read the database username from the .env file.
-      # The :? syntax requires a nonempty value.
       DB_USER: ${DB_USER:?Set DB_USER}
 
     # Make the db_password secret available inside the container.
@@ -61,23 +59,6 @@ services:
           test -f /var/lib/mysql/.inception-ready &&
           mariadb --protocol=socket -uroot -Nse 'SELECT 1' >/dev/null
 
-      # Explanation of the command:
-      # 1. test -f: Check whether the initialization marker exists.
-      # 2. &&: Run the next command only if the marker exists.
-      # 3. mariadb: Run the MariaDB client.
-      # 4. --protocol=socket: Connect through a Unix socket.
-      # 5. -uroot: Connect as the MariaDB root user.
-      # 6. -N: Do not display column names.
-      # 7. -s: Use silent output.
-      # 8. -e 'SELECT 1': Execute a simple SQL query.
-      # 9. >/dev/null: Discard standard output.
-      #
-      # Exit code 0 means success (healthy).
-      # A nonzero exit code means the check failed (unhealthy).
-      #
-      # The marker file must be created by your MariaDB
-      # initialization script when provisioning is complete.
-
       # Run the health check every 5 seconds.
       interval: 5s
 
@@ -94,77 +75,48 @@ services:
       start_period: 30s
   
   redis:
-    # Custom Redis caching server built from Debian (bonus requirements).
+    # Custom Redis caching server built from Debian.
     image: redis:inception
 
-    # Never download this image from a remote registry.
     pull_policy: never
 
-    # Path to the directory containing the Redis Dockerfile.
     build: ./requirements/bonus/redis
 
-    # Always restart the container unless we stopped it manually.
     restart: unless-stopped
 
-    # Allow the service time to persist in-flight client data.
     stop_grace_period: 10s
 
-    # Make the redis_password secret available inside the container.
     secrets: [redis_password]
 
-    # Connect Redis to the internal inception network only.
-    # Port 6379 is deliberately NOT published to the host machine:
-    # only NGINX publishes port 443 in this project.
     networks: [inception]
 
-    # Define how Docker checks whether Redis is healthy.
     healthcheck:
       test:
         - CMD-SHELL
         - >-
           redis-cli --no-auth-warning -a "$$(cat /run/secrets/redis_password)" ping | grep -q PONG
 
-      # 1. cat: Read the Redis password secret.
-      # 2. -a: Authenticate redis-cli with that password.
-      # 3. --no-auth-warning: Suppress the harmless CLI warning
-      #    about passing a password on the command line.
-      # 4. ping: Ask Redis for a response.
-      # 5. grep -q PONG: Succeed only when Redis answers PONG.
-      #
-      # A wrong or missing password makes this check fail,
-      # which verifies authentication is really enforced.
-
-      # Run the health check every 5 seconds.
       interval: 5s
 
-      # Each health check must finish within 3 seconds.
       timeout: 3s
 
-      # Mark unhealthy after 20 consecutive failures.
       retries: 20
 
-      # Allow 10 seconds for startup.
       start_period: 10s
 
   # WordPress: PHP-FPM application server
   wordpress:
 
-    # Name and tag of the custom WordPress image.
     image: wordpress:inception
 
-    # Do not pull the image from a remote registry.
     pull_policy: never
 
-    # Build the image using the Dockerfile in this directory.
     build: ./requirements/wordpress
 
-    # Restart automatically unless manually stopped.
     restart: unless-stopped
 
-    # Allow the service time to shut down cleanly.
     stop_grace_period: 30s
 
-    # Pass database connection settings to the container.
     environment:
 
       # Database hostname.
@@ -172,14 +124,13 @@ services:
       # container on the shared inception network.
       DB_HOST: mariadb
 
-      # Database name read from the .env file.
       DB_NAME: ${DB_NAME:?Set DB_NAME}
 
-      # Database username read from the .env file.
       DB_USER: ${DB_USER:?Set DB_USER}
 
       # Path where the application expects to read its password.
       # This variable does not contain the password itself.
+      # The file where the password will be stored inside the container.
       DB_PASSWORD_FILE: /run/credentials/db_password
 
       DOMAIN_NAME: ${DOMAIN_NAME:?Set DOMAIN_NAME}
@@ -193,8 +144,6 @@ services:
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
 
-      # Path where PHP workers expect to read the Redis password.
-      # This variable does not contain the password itself.
       REDIS_PASSWORD_FILE: /run/credentials/redis_password
 
     # Mount the database, account, and Redis password secrets.
@@ -238,51 +187,28 @@ services:
           SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_URI=/ping REQUEST_METHOD=GET
           cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong
 
-      # Explanation:
-      # 1. SCRIPT_NAME and SCRIPT_FILENAME: Select PHP-FPM's internal ping handler.
-      # 2. REQUEST_URI=/ping: Specify the internal readiness path.
-      # 3. REQUEST_METHOD=GET: Simulate an HTTP GET request.
-      # 4. cgi-fcgi: Send a FastCGI request to PHP-FPM.
-      # 5. -bind -connect: Connect to the existing FastCGI server.
-      # 6. 127.0.0.1:9000: PHP-FPM's local listener.
-      # 7. grep -q pong: Succeed only when the ping response is received.
-      #
-      # The ping handler is internal; no public diagnostic file is needed.
-
-      # Execute the health check every 5 seconds.
       interval: 5s
 
-      # Give each check up to 5 seconds to complete.
       timeout: 5s
 
-      # Mark unhealthy after 20 consecutive failed checks.
       retries: 20
 
-      # Allow extra time for initial WordPress installation.
       start_period: 30s
 
   # NGINX: HTTPS web server and reverse proxy
   nginx:
 
-    # Name and tag of our custom NGINX image.
     image: nginx:inception
 
-    # Only use a locally built or available image.
     pull_policy: never
 
-    # Build NGINX from its Dockerfile directory.
     build: ./requirements/nginx
 
-    # Restart automatically unless manually stopped.
     restart: unless-stopped
 
-    # Allow NGINX time to finish active requests.
     stop_grace_period: 15s
 
-    # Pass the domain name into the NGINX container.
     environment:
-
-      # Read the domain name from the .env file.
       DOMAIN_NAME: ${DOMAIN_NAME:?Set DOMAIN_NAME}
 
     # Publish container ports to the host machine.
@@ -305,12 +231,9 @@ services:
     # Connect NGINX to the same inception network.
     networks: [inception]
 
-    # Make NGINX depend on WordPress readiness.
     depends_on:
 
       wordpress:
-
-        # Start NGINX only after WordPress becomes healthy.
         condition: service_healthy
 
     # Check whether NGINX responds to HTTPS requests.
@@ -324,26 +247,10 @@ services:
           --resolve "$${DOMAIN_NAME}:443:127.0.0.1"
           "https://$${DOMAIN_NAME}/" >/dev/null
 
-      # Explanation:
-      # curl: Send an HTTPS request to the actual website.
-      # --noproxy '*': Do not use a proxy for this request.
-      # -f: Fail for HTTP 400/500 error responses.
-      # -k: Accept the local self-signed certificate.
-      # -S and -s: Show errors without progress output.
-      # --max-time 4: Limit the request to four seconds.
-      # --resolve: Reach local NGINX while retaining the configured hostname.
-      # $$: Let the container shell expand the variable instead of Compose.
-      # >/dev/null: Discard the page body.
-      #
-      # A successful response confirms the website is reachable through NGINX.
-
-      # Execute a check every 5 seconds.
       interval: 5s
 
-      # Allow up to 5 seconds for each check.
       timeout: 5s
 
-      # Mark unhealthy after 15 consecutive failures.
       retries: 15
 
 # Networks: Communication between containers
@@ -377,10 +284,6 @@ volumes:
     # Explicit Docker volume name.
     name: inception_website
 
-  # Docker manages the storage location for these volumes.
-  # Their host paths depend on Docker's configured data-root.
-  # They are not explicitly mapped to host directories here.
-
 # Secrets: Sensitive configuration data
 secrets:
 
@@ -390,9 +293,6 @@ secrets:
     # Read the password from this file on the host.
     # The path is relative to the Compose file directory.
     file: ./secrets/db_password.txt
-
-    # Compose makes this secret available only to services
-    # that explicitly request it using "secrets".
 
   # Provide the password used when creating the WordPress administrator.
   wp_admin_password:

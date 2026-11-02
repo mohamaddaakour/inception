@@ -1,6 +1,6 @@
 # Use the local environment and Compose configuration.
 COMPOSE = docker compose --env-file srcs/.env -f srcs/docker-compose.yml
-.DEFAULT_GOAL := up
+
 .PHONY: all up down stop status logs config
 
 # Build and start the complete application.

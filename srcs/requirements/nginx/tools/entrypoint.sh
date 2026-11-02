@@ -1,6 +1,8 @@
 #!/bin/sh
+
 set -eu
 : "${DOMAIN_NAME:?DOMAIN_NAME is required}"
+
 mkdir -p /etc/nginx/tls
 
 # Renew missing, expiring, or domain-mismatched local certificates.

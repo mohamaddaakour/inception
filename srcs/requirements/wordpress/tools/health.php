@@ -1,5 +1,4 @@
 <?php
-// This endpoint queries the real database. It is not a hardcoded success stub.
 header('Content-Type: application/json');
 try {
     $secret = file_get_contents(getenv('DB_PASSWORD_FILE'));
