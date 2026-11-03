@@ -19,13 +19,15 @@ case "$password" in
 esac
 [ "${#password}" -eq 64 ] || { echo 'Invalid Redis secret length' >&2; exit 1; }
 
-# Append requirepass to a runtime config copy instead of a command-line flag,
-# so the password never shows up in /proc/<pid>/cmdline or process listings.
+# Here, we configured Redis to use a password without passing the password directly as a command-line argument.
+# Copy the configuration file
 cp /etc/redis/redis.conf /tmp/redis.conf
+
+# Add the password to the copied configuration
 printf "\nrequirepass %s\n" "$password" >> /tmp/redis.conf
+
 # Remove the password from the shell after writing the runtime configuration.
 unset password
 
-# Replace the shell with the Redis server in the foreground,
-# making Redis PID 1 so it receives stop signals directly.
+# Start redis
 exec redis-server /tmp/redis.conf --daemonize no
