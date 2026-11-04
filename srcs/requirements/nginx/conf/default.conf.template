@@ -13,7 +13,7 @@ server {
     # Allow only the TLS versions required by the subject.
     ssl_protocols TLSv1.2 TLSv1.3;
 
-    # Where NGINX finds your WordPress files (this is a volume).
+    # Where NGINX finds your WordPress files.
     root /var/www/html;
 
     # Use WordPress's front controller when a directory is requested.

@@ -1,11 +1,13 @@
 #!/bin/sh
 
+# Validate the domain
 set -eu
 : "${DOMAIN_NAME:?DOMAIN_NAME is required}"
 
+# Create the TLS directory
 mkdir -p /etc/nginx/tls
 
-# Renew missing, expiring, or domain-mismatched local certificates.
+# Check whether the certificate needs renewal.
 if [ ! -s /etc/nginx/tls/site.key ] || [ ! -s /etc/nginx/tls/site.crt ] \
     || ! openssl x509 -in /etc/nginx/tls/site.crt -checkend 86400 -noout >/dev/null 2>&1 \
     || ! openssl x509 -in /etc/nginx/tls/site.crt -checkhost "$DOMAIN_NAME" -noout >/dev/null 2>&1; then

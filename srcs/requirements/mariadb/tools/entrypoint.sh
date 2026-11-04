@@ -20,10 +20,11 @@ fi
 if [ ! -f /var/lib/mysql/.inception-ready ]; then
 
     # Start a temporary MariaDB server in the background without TCP networking.
-    # $! stores the PID of the background process.
+    # `$!` stores the PID of the background process.
     mariadbd --user=mysql --datadir=/var/lib/mysql --skip-networking &
     temporary_pid=$!
 
+    # `trap`` executes commands when certain events happen.
     # Clean up the temporary server when the script exits.
     # Exit with an error if an interrupt or termination signal is received.
     trap 'kill "$temporary_pid" 2>/dev/null || :; wait "$temporary_pid" 2>/dev/null || :' EXIT
