@@ -37,6 +37,17 @@ server {
         return 403;
     }
 
+    # Serve the static project showcase from the NGINX image.
+    location = /showcase {
+        # status code 301 means permanent redirect
+        return 301 /showcase/;
+    }
+
+    location ^~ /showcase/ {
+        alias /usr/share/nginx/html/showcase/;
+        index index.html;
+    }
+
     # Serve existing files and directories, or let WordPress handle the URL.
     location / {
         # Preserve query parameters when forwarding to the front controller.

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f1e9">
+    <meta
+      name="description"
+      content="A compact showcase of Inception, a secure and persistent WordPress stack built with Docker."
+    >
+    <title>Inception — A site built to stay up</title>
+    <link rel="stylesheet" href="/showcase/styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Inception home">
+        <span class="brand-mark" aria-hidden="true">i.</span>
+        <span>inception<span class="brand-period">.</span></span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="#stack">The stack</a>
+        <a href="#principles">Principles</a>
+        <a class="nav-cta" href="#details">Explore the build <span aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero page-width" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="status-dot"></span> A small site with a solid foundation</p>
+          <h1 id="hero-title">A site built<br>to <span>stay up.</span></h1>
+          <p class="hero-summary">
+            Inception brings the pieces of a modern website together: secure
+            delivery, persistent storage, and a cache that keeps things moving.
+          </p>
+          <a class="button" href="#stack">Meet the stack <span aria-hidden="true">↓</span></a>
+          <p class="hero-note">Designed, containerized, and ready to serve.</p>
+        </div>
+
+        <div class="hero-art" role="img" aria-label="Four connected services: NGINX, WordPress, MariaDB, and Redis">
+          <div class="orbit orbit-one"></div>
+          <div class="orbit orbit-two"></div>
+          <div class="orbit orbit-three"></div>
+          <div class="core">
+            <span class="core-symbol" aria-hidden="true">i</span>
+            <span>one site</span>
+          </div>
+          <div class="service service-nginx"><span class="service-icon">↗</span><span>NGINX<small>secure entry</small></span></div>
+          <div class="service service-wordpress"><span class="service-icon">W</span><span>WordPress<small>the experience</small></span></div>
+          <div class="service service-mariadb"><span class="service-icon">▤</span><span>MariaDB<small>your content</small></span></div>
+          <div class="service service-redis"><span class="service-icon">ϟ</span><span>Redis<small>quick recall</small></span></div>
+          <span class="art-caption">Everything has its place.</span>
+        </div>
+      </section>
+
+      <section class="metrics page-width" aria-label="Project highlights">
+        <div><strong>04</strong><span>purpose-built services</span></div>
+        <div><strong>01</strong><span>public entry point</span></div>
+        <div><strong>∞</strong><span>room to grow</span></div>
+        <p>One thoughtful stack.<br>Many moving parts, working as one.</p>
+      </section>
+
+      <section class="stack-section" id="stack">
+        <div class="page-width">
+          <div class="section-heading">
+            <p class="eyebrow">01 / The stack</p>
+            <h2>Small services.<br><span>Clear responsibilities.</span></h2>
+            <p>Each component does one job, and talks to the others over a private network.</p>
+          </div>
+          <div class="stack-grid">
+            <article class="stack-card card-edge">
+              <span class="card-number">01</span>
+              <span class="card-icon icon-edge" aria-hidden="true">↗</span>
+              <h3>NGINX</h3>
+              <p>The only public doorway. It handles HTTPS and routes requests to the right place.</p>
+              <span class="card-tag">The front door</span>
+            </article>
+            <article class="stack-card card-app">
+              <span class="card-number">02</span>
+              <span class="card-icon icon-app" aria-hidden="true">W</span>
+              <h3>WordPress</h3>
+              <p>The publishing experience, powered by PHP-FPM and made for creating.</p>
+              <span class="card-tag">The application</span>
+            </article>
+            <article class="stack-card card-data">
+              <span class="card-number">03</span>
+              <span class="card-icon icon-data" aria-hidden="true">▤</span>
+              <h3>MariaDB</h3>
+              <p>A dedicated home for the site's content, accounts, and application data.</p>
+              <span class="card-tag">The memory</span>
+            </article>
+            <article class="stack-card card-cache">
+              <span class="card-number">04</span>
+              <span class="card-icon icon-cache" aria-hidden="true">ϟ</span>
+              <h3>Redis</h3>
+              <p>An in-memory object cache that helps repeat requests feel snappy.</p>
+              <span class="card-tag">The shortcut</span>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="principles page-width" id="principles">
+        <div class="principles-intro">
+          <p class="eyebrow">02 / Built with intention</p>
+          <h2>Good foundations<br>make <span>good things.</span></h2>
+          <p>Infrastructure should feel invisible when everything is working. These choices help keep it that way.</p>
+        </div>
+        <div class="principle-list">
+          <article>
+            <span class="principle-icon" aria-hidden="true">◈</span>
+            <div><h3>Private by default</h3><p>Only HTTPS is exposed. Application and data services stay on an internal network.</p></div>
+            <span class="principle-arrow" aria-hidden="true">↗</span>
+          </article>
+          <article>
+            <span class="principle-icon" aria-hidden="true">⟳</span>
+            <div><h3>Made to persist</h3><p>Named volumes keep site files and database content through container changes.</p></div>
+            <span class="principle-arrow" aria-hidden="true">↗</span>
+          </article>
+          <article>
+            <span class="principle-icon" aria-hidden="true">⌘</span>
+            <div><h3>Easy to reason about</h3><p>Separate services make the system easier to build, inspect, and maintain.</p></div>
+            <span class="principle-arrow" aria-hidden="true">↗</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="details-section" id="details">
+        <div class="details-inner page-width">
+          <div>
+            <p class="eyebrow">03 / A closer look</p>
+            <h2>Behind the<br><span>good first impression.</span></h2>
+          </div>
+          <div class="details-copy">
+            <p>This showcase is a static HTML and CSS page served directly by NGINX. The main site and WordPress dashboard remain right where they are.</p>
+            <a href="/" class="text-link">Visit the main site <span aria-hidden="true">↗</span></a>
+            <a href="/wp-admin/" class="text-link">Open the WordPress dashboard <span aria-hidden="true">↗</span></a>
+          </div>
+          <div class="build-stamp"><span>BUILT WITH</span><strong>Docker Compose</strong><span>AND A LITTLE CARE</span></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer page-width">
+      <a class="brand" href="#top"><span class="brand-mark" aria-hidden="true">i.</span><span>inception<span class="brand-period">.</span></span></a>
+      <p>A little infrastructure, thoughtfully put together.</p>
+      <a href="#top" class="back-top">Back to top ↑</a>
+    </footer>
+  </body>
+</html>
