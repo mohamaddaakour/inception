@@ -11,10 +11,12 @@ try {
         rtrim($secret, "\r\n"),
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 2]
     );
+
+    // We apply this endpoint to test the health of wordpress page
     $value = (int) $db->query('SELECT 1')->fetchColumn();
+
     echo json_encode(['status' => 'ok', 'database' => $value]) . "\n";
 } catch (Throwable $error) {
-    // Do not send credentials, SQL, or connection details to a browser.
     http_response_code(503);
     echo json_encode(['status' => 'unavailable']) . "\n";
 }

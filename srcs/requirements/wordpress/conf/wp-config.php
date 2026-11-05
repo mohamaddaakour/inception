@@ -1,5 +1,6 @@
+// Configures WordPress like its database connection, security settings, Redis caching, and WordPress initialization.
+
 <?php
-// Read configuration at runtime; never write passwords into this file.
 define('DB_NAME', getenv('DB_NAME'));
 define('DB_USER', getenv('DB_USER'));
 define('DB_PASSWORD', rtrim(file_get_contents(getenv('DB_PASSWORD_FILE')), "\r\n"));
