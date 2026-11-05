@@ -82,7 +82,7 @@ Each service uses its own Dockerfile and a local image named `<service>:inceptio
 
 - `srcs/docker-compose.yml`: services, network, volumes, secrets, and readiness ordering.
 - `srcs/requirements/<service>/Dockerfile`: custom service builds.
-- `srcs/requirements/bonus/<service>/Dockerfile`: bonus service builds; currently `redis`.
+- `srcs/requirements/bonus/<service>/Dockerfile`: bonus service builds, including Redis and the standalone static resume site.
 - `srcs/requirements/*/conf/`: NGINX, PHP-FPM, WordPress, and Redis configuration.
 - `srcs/requirements/*/tools/`: entrypoints, configuration validation, and the diagnostic endpoint.
 
@@ -91,6 +91,8 @@ MariaDB initializes an empty database volume, provisions the application account
 WordPress installs files when absent, retains its existing data and salts, waits for authenticated SQL and Redis connections, installs the site when needed, and creates a missing subscriber. It installs and activates the pinned Redis Object Cache plugin and enables the `object-cache.php` drop-in so WordPress stores internal objects and repeated query results in Redis. WP-CLI runs as `www-data`; quiet mode prevents prompted passwords from being echoed in logs. PHP-FPM then runs in the foreground as PID 1. Its internal ping supports readiness ordering and is not a public website endpoint.
 
 Redis starts in the foreground as PID 1 with a 256 MB memory cap and least-recently-used eviction. Its password comes from the Compose secret at startup; the container's healthcheck executes an authenticated `ping`. The cache is memory-only and is repopulated automatically after restarts.
+
+The static resume site is a separate NGINX container built from `srcs/requirements/bonus/static-site/Dockerfile`. It serves static HTML/CSS on port 8080 inside the Compose network. The public NGINX service proxies `/showcase/` to it; port 8080 is not published to the host.
 
 NGINX generates a local TLS certificate, expands only the domain placeholder, checks its configuration, and runs in the foreground. Docker DNS is refreshed to reach replaced application containers. It serves only HTTPS, mounts website files read-only, and blocks hidden files, direct configuration access, and PHP execution beneath uploads.
 

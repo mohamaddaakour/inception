@@ -37,15 +37,13 @@ server {
         return 403;
     }
 
-    # Serve the static project showcase from the NGINX image.
+    # Redirect to the canonical path for the static resume site.
     location = /showcase {
-        # status code 301 means permanent redirect
         return 301 /showcase/;
     }
 
     location ^~ /showcase/ {
-        alias /usr/share/nginx/html/showcase/;
-        index index.html;
+        proxy_pass http://static-site:8080/;
     }
 
     # Serve existing files and directories, or let WordPress handle the URL.

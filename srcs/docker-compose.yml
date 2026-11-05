@@ -104,6 +104,35 @@ services:
 
       start_period: 10s
 
+  # Standalone static resume site for the bonus requirement.
+  static-site:
+
+    image: static-site:inception
+
+    pull_policy: never
+
+    build: ./requirements/bonus/static-site
+
+    restart: unless-stopped
+
+    networks: [inception]
+
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --silent
+        - http://127.0.0.1:8080/
+
+      interval: 5s
+
+      timeout: 3s
+
+      retries: 10
+
+      start_period: 5s
+
   # WordPress: PHP-FPM application server
   wordpress:
 
@@ -234,6 +263,9 @@ services:
     depends_on:
 
       wordpress:
+        condition: service_healthy
+
+      static-site:
         condition: service_healthy
 
     # Check whether NGINX responds to HTTPS requests.

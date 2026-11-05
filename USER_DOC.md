@@ -2,7 +2,7 @@
 
 ## Provided services
 
-The stack provides a WordPress website and administration dashboard. NGINX accepts HTTPS connections, PHP-FPM executes WordPress, MariaDB stores the database, and Redis caches repeated database queries in memory so repeated page views use less database work. Only port 443 is published.
+The stack provides a WordPress website and administration dashboard, plus a static resume site at `/showcase/`. NGINX accepts HTTPS connections, PHP-FPM executes WordPress, MariaDB stores the database, and Redis caches repeated database queries in memory so repeated page views use less database work. The static site runs in its own container. Only port 443 is published.
 
 ## Start and stop
 
@@ -59,7 +59,7 @@ make status
 make logs
 ```
 
-All four services should be healthy. In a browser:
+All five services should be healthy. In a browser:
 
 1. Sign in as administrator and publish a post.
 2. Upload a small image and confirm it appears publicly.
@@ -67,6 +67,6 @@ All four services should be healthy. In a browser:
 4. Sign in as subscriber and confirm publishing, plugin installation, and user management are unavailable.
 5. Run `make down`, then `make up`; confirm both accounts, the post, and image remain.
 
-`3306/tcp`, `9000/tcp`, and `6379/tcp` in status output are internal ports when no host mapping is shown. NGINX alone should show `443->443`.
+`3306/tcp`, `9000/tcp`, `6379/tcp`, and `8080/tcp` in status output are internal ports when no host mapping is shown. NGINX alone should show `443->443`.
 
 For connection problems, check the VM IP, hosts entry, port 443, and service status. For certificate warnings, verify the address before accepting the local exception. For HTTP 502/503 errors, inspect application/database logs. Do not delete persistent storage to resolve a configuration error.

@@ -4,7 +4,7 @@
 
 ## Description
 
-Inception runs a WordPress website inside a Linux virtual machine using four custom Docker images: NGINX, WordPress with PHP-FPM, MariaDB, and Redis. NGINX is the only public entrypoint, on HTTPS port 443 with TLS 1.2 or TLS 1.3. Two named volumes preserve the database and website files, and Redis caches repeat database queries in memory.
+Inception runs a WordPress website inside a Linux virtual machine using custom Docker images for NGINX, WordPress with PHP-FPM, MariaDB, Redis, and a static resume site. NGINX is the only public entrypoint, on HTTPS port 443 with TLS 1.2 or TLS 1.3. Two named volumes preserve the database and website files, and Redis caches repeat database queries in memory.
 
 ## Instructions
 
@@ -62,6 +62,8 @@ WordPress and WP-CLI versions are pinned in the WordPress Dockerfile. The CLI do
 Docker stores the named volumes beneath `/home/<login>/data/volumes/`. The database volume appears at `/var/lib/mysql` in MariaDB; the website volume appears at `/var/www/html` in WordPress and read-only in NGINX. Each mount accesses the same underlying data, not a synchronized copy.
 
 The Redis caching service runs in its own container built from Debian. WordPress reaches it through the PHP Redis extension and the official Redis Object Cache plugin, whose downloaded archive is pinned and verified with SHA-256. Redis listens only inside the bridge network, a shared password from a Compose secret protects every command, and captured keys stay within a 256 MB least-recently-used limit. The cache holds results in memory only; it is intentionally not persisted and is rebuilt as requests arrive after a restart.
+
+The static resume website is built from its own Debian-based Dockerfile in `srcs/requirements/bonus/static-site/`. It serves plain HTML and CSS in a separate container on the internal network; public NGINX proxies `/showcase/` to it. The static service has no host-published port and does not share or modify the WordPress volume.
 
 ## Resources
 

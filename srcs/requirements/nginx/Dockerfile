@@ -8,8 +8,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY conf/default.conf.template /etc/nginx/templates/default.conf.template
 
-COPY site/ /usr/share/nginx/html/showcase/
-
 COPY tools/entrypoint.sh /usr/local/bin/entrypoint
 
 RUN chmod 755 /usr/local/bin/entrypoint
