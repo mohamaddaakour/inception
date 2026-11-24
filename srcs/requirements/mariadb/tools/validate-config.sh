@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# Exit immediately if a command exits with a non-zero status, and treat unset variables as an error.
 set -eu
 
 # Validate database name and username.
@@ -10,8 +11,10 @@ for value in "${DB_NAME:-}" "${DB_USER:-}"; do
     [ "${#value}" -le 32 ] || { echo 'Identifier too long' >&2; exit 1; }
 done
 
+# Validate that the database username is not reserved.
 case "$DB_USER" in root|mysql|mariadb_sys) echo 'Reserved SQL user' >&2; exit 1 ;; esac
 
+# Validate that the database name is not reserved.
 case "$DB_NAME" in mysql|sys|information_schema|performance_schema) echo 'Reserved database' >&2; exit 1 ;; esac
 
 # Read and validate the password
