@@ -1,3 +1,2 @@
-# Keep local configuration and credentials out of Git.
 srcs/.env
 secrets/
