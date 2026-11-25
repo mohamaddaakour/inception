@@ -16,6 +16,7 @@ for name in "$WP_ADMIN_USER" "$WP_USER"; do
     esac
     [ "${#name}" -le 60 ] || { echo 'WordPress username too long' >&2; exit 1; }
 done
+
 # Reject admin anywhere, irrespective of capitalization (also covers administrator).
 case "$(printf '%s' "$WP_ADMIN_USER" | tr '[:upper:]' '[:lower:]')" in
     *admin*) echo 'Administrator username must not contain admin' >&2; exit 1 ;;
@@ -34,6 +35,7 @@ for file in /run/secrets/db_password /run/secrets/wp_admin_password /run/secrets
     esac
     [ "${#password}" -eq 64 ] || { echo 'Invalid secret length' >&2; exit 1; }
 done
+
 # Remove the last password from the shell after validation.
 unset password
 
@@ -67,6 +69,7 @@ if [ ! -s /var/www/html/.inception-salts.php ]; then
         }
     '
 fi
+
 # Configuration always reads secrets and DB settings from runtime files/env.
 install -m 640 /opt/inception/wp-config.php /var/www/html/.wp-config.php.tmp
 mv -f /var/www/html/.wp-config.php.tmp /var/www/html/wp-config.php
@@ -141,6 +144,7 @@ if ! wp user get "$WP_USER" --field=ID >/dev/null 2>&1; then
     wp user create "$WP_USER" "$WP_USER_EMAIL" --role=subscriber \
         --quiet --prompt=user_pass --porcelain < /run/secrets/wp_user_password
 fi
+
 # Reject unexpected existing roles rather than silently changing existing users.
 wp user list --role=administrator --field=user_login | grep -Fxq -- "$WP_ADMIN_USER"
 wp user list --role=subscriber --field=user_login | grep -Fxq -- "$WP_USER"

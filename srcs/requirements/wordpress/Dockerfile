@@ -1,5 +1,6 @@
 FROM debian:bookworm-slim
 
+# Install the required PHP extensions and dependencies.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     php8.2-fpm php8.2-cli php8.2-mysql php8.2-curl php8.2-gd \
     php8.2-mbstring php8.2-xml php8.2-zip php8.2-intl \
@@ -7,9 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfcgi-bin ca-certificates curl unzip util-linux \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the pinned CLI only after verifying its digest.
 ARG WP_CLI_VERSION=2.12.0
 ARG WP_CLI_SHA256=ce34ddd838f7351d6759068d09793f26755463b4a4610a5a5c0a97b68220d85c
+
+# Download and verify pinned WP CLI into the image.
 RUN curl -fsSL --retry 3 \
     "https://github.com/wp-cli/wp-cli/releases/download/v${WP_CLI_VERSION}/wp-cli-${WP_CLI_VERSION}.phar" \
     -o /usr/local/bin/wp \
@@ -17,9 +19,10 @@ RUN curl -fsSL --retry 3 \
     && chmod 755 /usr/local/bin/wp \
     && wp --allow-root --info
 
-# Pin the application version for reproducible builds.
+
 ARG WP_VERSION=7.1.4
-# Use ZIP extraction to preserve long filenames.
+
+# Download and verify pinned WordPress into the image.
 RUN mkdir -p /opt/wordpress \
     && curl -fsSL --retry 3 "https://wordpress.org/wordpress-${WP_VERSION}.zip" \
        -o /tmp/wordpress.zip \
@@ -28,9 +31,11 @@ RUN mkdir -p /opt/wordpress \
     && wp --allow-root --path=/opt/wordpress core verify-checksums \
        --version="${WP_VERSION}" --locale=en_US
 
-# Download and verify pinned Redis Object Cache plugin into the image.
+
 ARG REDIS_CACHE_VERSION=3.0.0
 ARG REDIS_CACHE_SHA256=7a03342d3defbe94cac8d0470b42dc1a1c34331b19c47205df20ceccd3c8f54a
+
+# Download and verify pinned Redis Cache plugin into the image.
 RUN mkdir -p /opt/plugins \
     && curl -fsSL --retry 3 \
        "https://downloads.wordpress.org/plugin/redis-cache.${REDIS_CACHE_VERSION}.zip" \
@@ -45,6 +50,7 @@ COPY tools/health.php /opt/inception/health.php
 
 COPY tools/entrypoint.sh /usr/local/bin/entrypoint
 
+# Set the entrypoint executable and configure PHP error logging.
 RUN chmod 755 /usr/local/bin/entrypoint \
     && sed -i "s|^error_log = .*|error_log = /proc/self/fd/2|" /etc/php/8.2/fpm/php-fpm.conf
 
